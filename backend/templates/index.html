@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #666;
+        }
+
+        input[type="time"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button.secondary {
+            background-color: #6c757d;
+        }
+
+        button.secondary:hover {
+            background-color: #545b62;
+        }
+
+        #status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+            background-color: #e9ecef;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .time-list {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 1rem;
+        }
+
+        .time-list li {
+            background: #e9ecef;
+            padding: 0.5rem;
+            margin-bottom: 0.25rem;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .remove-btn {
+            color: red;
+            cursor: pointer;
+            font-weight: bold;
+            background: none;
+            border: none;
+            width: auto;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Class Attendance</h1>
+
+        <div class="control-group">
+            <label>Add Scheduled Scan Time:</label>
+            <input type="time" id="timeInput">
+            <button class="secondary" onclick="addTime()">Add Time</button>
+        </div>
+
+        <ul id="scheduleList" class="time-list"></ul>
+
+        <button onclick="saveSchedule()">Save Schedule</button>
+
+        <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid #eee;">
+
+        <button onclick="scanNow()" style="background-color: #28a745;">SCAN NOW</button>
+
+        <div id="status">System Ready</div>
+    </div>
+
+    <script>
+        let scheduledTimes = [];
+
+        function addTime() {
+            const input = document.getElementById('timeInput');
+            const time = input.value;
+            if (time && !scheduledTimes.includes(time)) {
+                scheduledTimes.push(time);
+                scheduledTimes.sort();
+                renderList();
+                input.value = '';
+            }
+        }
+
+        function removeTime(time) {
+            scheduledTimes = scheduledTimes.filter(t => t !== time);
+            renderList();
+        }
+
+        function renderList() {
+            const list = document.getElementById('scheduleList');
+            list.innerHTML = '';
+            scheduledTimes.forEach(time => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    ${time}
+                    <button class="remove-btn" onclick="removeTime('${time}')">×</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        async function saveSchedule() {
+            const status = document.getElementById('status');
+            status.textContent = "Saving schedule...";
+
+            try {
+                const response = await fetch('/set-schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ times: scheduledTimes })
+                });
+                const data = await response.json();
+                status.textContent = data.message;
+            } catch (e) {
+                status.textContent = "Error saving schedule.";
+            }
+        }
+
+        async function scanNow() {
+            const status = document.getElementById('status');
+            status.textContent = "Scanning in progress... Please wait.";
+
+            try {
+                const response = await fetch('/scan-now', { method: 'POST' });
+                const data = await response.json();
+                // The polling will update the UI, but we can set it here too
+                status.textContent = `Scan Complete. Detected: ${data.detected.join(', ')}`;
+            } catch (e) {
+                status.textContent = "Error during scan.";
+            }
+        }
+
+        let lastTimestamp = null;
+        async function checkLastScan() {
+            try {
+                const response = await fetch('/last-scan');
+                const data = await response.json();
+
+                if (data.timestamp && data.timestamp !== lastTimestamp) {
+                    lastTimestamp = data.timestamp;
+                    const status = document.getElementById('status');
+                    const detectedStr = data.detected.length > 0 ? data.detected.join(', ') : "None";
+                    status.innerHTML = `<strong>Last Scan (${data.type}):</strong> ${data.timestamp}<br>Detected: ${detectedStr}`;
+
+                    // Optional: Browser notification could go here
+                }
+            } catch (e) {
+                console.error("Error fetching last scan:", e);
+            }
+        }
+
+        // Poll every 5 seconds
+        setInterval(checkLastScan, 5000);
+        checkLastScan(); // Initial check
+    </script>
+</body>
+
+</html>
