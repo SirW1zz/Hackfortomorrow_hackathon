@@ -50,6 +50,31 @@ def update_attendance(name, status):
         print(f"Error updating database for {name}: {e}")
         return False
 
+def clean_database_names():
+    """
+    General utility to clean ALL names in the database.
+    Removes leading/trailing whitespace and newlines.
+    """
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        print("Cleaning database names (trimming whitespace/newlines)...")
+        # Trim whitespace
+        cur.execute('UPDATE "Attendance" SET "Name" = TRIM(BOTH FROM "Name")')
+        # Remove newlines/carriage returns
+        cur.execute('UPDATE "Attendance" SET "Name" = REGEXP_REPLACE("Name", E\'[\\n\\r]+\', \'\', \'g\')')
+        
+        rows_affected = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"Database cleaning complete. Rows affected: {rows_affected}")
+        return True
+    except Exception as e:
+        print(f"Error cleaning database: {e}")
+        return False
+
 def reset_attendance():
     """
     Optional: Reset everyone to 0 (Absent) before a new day/scan block?

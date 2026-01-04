@@ -1,10 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
 from backend.camera import scan_class
+from backend.database import clean_database_names
 import random
 import time
 import datetime
 import atexit
+
+# Clean DB on startup
+clean_database_names()
 
 app = Flask(__name__)
 
